@@ -14,39 +14,18 @@ jobs:
     <<: *defaults
     steps:
       - checkout
-      - save_cache:
-          key: discord-bot-{{ .Branch }}-{{ .Revision }}
-          paths:
-            - ~/discord-bot
-      - restore_cache:
-          keys:
-            - discord-bot-deps-{{ checksum "requirements.txt" }}
-      - run:
-        name: Install and activate virtual environment
-        command: |
-          if [ ! -d "venv" ]; then
-            pip install virtualenv
-            virtualenv venv
-          fi
-      - run:
-          name: Install requirements
-          command: |
-            . venv/bin/activate
-            pip install -r requirements.txt
-      - save_cache:
-          key: discord-bot-deps-{{ checksum "requirements.txt" }}
-          paths:
-            - venv
+      - python/load-cache
+      - python/install-deps
+      - python/save-cache
   build-and-test:
     executor: python/default
     steps:
       - checkout
       - python/load-cache
-      - python/install-deps
+      run:
+        command: pytest tests
+        name: Test
       - python/save-cache
-      - run:
-          command: pytest tests
-          name: Test
       - sonarcloud/scan
 
 workflows:
