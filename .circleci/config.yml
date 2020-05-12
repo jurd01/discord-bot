@@ -69,4 +69,4 @@ workflows:
       - setup
       - pytest:
           requires:
-            setup
+            - setup
