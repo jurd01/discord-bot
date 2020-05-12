@@ -3,7 +3,40 @@ version: 2.1
 orbs:
   python: circleci/python@0.2.1
   sonarcloud: sonarsource/sonarcloud@1.0.1
+
+defaults: &defaults
+  working_directory: ~/discord-bot
+  docker:
+    - image: circleci/python:3.8
+
 jobs:
+  setup:
+    <<: *defaults
+    steps:
+      - checkout
+      - save_cache:
+          key: discord-bot-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - ~/discord-bot
+      - restore_cache:
+          keys:
+            - discord-bot-deps-{{ checksum "requirements.txt" }}
+      - run:
+        name: Install and activate virtual environment
+        command: |
+          if [ ! -d "venv" ]; then
+            pip install virtualenv
+            virtualenv venv
+          fi
+      - run:
+          name: Install requirements
+          command: |
+            . venv/bin/activate
+            pip install -r requirements.txt
+      - save_cache:
+          key: discord-bot-deps-{{ checksum "requirements.txt" }}
+          paths:
+            - venv
   build-and-test:
     executor: python/default
     steps:
@@ -12,7 +45,7 @@ jobs:
       - python/install-deps
       - python/save-cache
       - run:
-          command: python ./src/hello.py
+          command: pytest tests
           name: Test
       - sonarcloud/scan
 

@@ -13,25 +13,20 @@ def get_external_ip():
 
 
 callback = f'http://{get_external_ip()}:65535/'
-secret = 'f8zjdmgctwfpo58t4zq1utxsbfxqvf'
 lease_seconds = 864000  # TODO refresh
-
+secret = os.getenv('TWITCH_CLIENT_SECRET')
 logger.debug(f'callback url: {callback}')
 
 
 class Client:
     def __init__(self):
-        # self.config = parse_config('path')  # TODO
-        # self.client_id = self.config['client_id']
-        # self.client_secret = self.config['client_secret']
         self.client_id = "936qcw2vc0rld477y9qd6uly3v0ejo"
-        self.client_secret = secret
         self.token = None
 
     def _refresh_token(self):
         params = {
             'client_id': self.client_id,
-            'client_secret': self.client_secret,
+            'client_secret': secret,
             'grant_type': 'client_credentials',
         }
         data = self.make_request('https://id.twitch.tv/oauth2/token', requests.post, params=params)

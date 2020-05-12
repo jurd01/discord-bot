@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 
-from src.client import Client
+from src.twitch.client import Client
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)
@@ -13,10 +13,13 @@ CONTENT_LENGTH = 'Content-Length'
 CONTENT_TYPE = 'Content-Type'
 X_HUB_SIGNATURE = 'X-Hub-Signature'
 
-client = None
+HOST_NAME = '0.0.0.0'
+HOST_PORT = 65535
+
+secret = None
 
 
-class Server(BaseHTTPRequestHandler):
+class RequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         """
         Handle the incoming challenge-response from Twitch to confirm webhook.
@@ -60,14 +63,14 @@ class Server(BaseHTTPRequestHandler):
         algorithm, received_hash = hub_signature.split('=')
         logger.debug(f'Message received with hash: {received_hash} and algorithm {algorithm}')
 
-        expected_hash = hmac.new(client.secret.encode(), post_data, algorithm)
+        expected_hash = hmac.new(secret.encode(), post_data, algorithm)
         if not hmac.compare_digest(received_hash.encode(), expected_hash.hexdigest().encode()):
             raise ConnectionError('Hash mismatch.')
 
         j = json.loads(post_data)
         data = j['data'][0]
         stream_status = data['stream_status']
-        """
+        """ example response
         {
         'data': [{
         'id': '0123456789',
@@ -93,24 +96,25 @@ class Server(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-def main():
-    global client
+class Server:
 
-    host_name = '0.0.0.0'
-    host_port = 65535
-    client = Client()
-    twitch_id = client.get_user_id('stabbystabby')
-    client.subscribe_to_live_notifications(twitch_id)
+    def __init__(self):
+        self.client = Client()
 
-    server = HTTPServer((host_name, host_port), Server)
-    try:
-        server.serve_forever()
-        logger.info('Server started')
+        global secret
+        secret = self.client.client_secret
 
-    except KeyboardInterrupt:
-        server.server_close()
-        logger.info('Server closing')
+    def start(self):
 
+        twitch_id = self.client.get_user_id('stabbystabby')
+        self.client.subscribe_to_live_notifications(twitch_id)
 
-if __name__ == '__main__':
-    main()
+        server = HTTPServer((HOST_NAME, HOST_PORT), RequestHandler)
+        try:
+            server.serve_forever()
+            logger.info('Server started')
+
+        except KeyboardInterrupt:
+            server.server_close()
+            logger.info('Server closing')
+
