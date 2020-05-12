@@ -18,6 +18,7 @@ jobs:
       - python/install-deps
       - python/save-cache
   build-and-test:
+    <<: *defaults
     executor: python/default
     steps:
       - checkout
