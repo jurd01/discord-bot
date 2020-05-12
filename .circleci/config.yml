@@ -15,12 +15,12 @@ jobs:
     steps:
       - checkout
       - save_cache:
-          key: auth-serverless-{{ .Branch }}-{{ .Revision }}
+          key: discord-bot-{{ .Branch }}-{{ .Revision }}
           paths:
-            - ~/auth-serverless
+            - ~/discord-bot
       - restore_cache:
           keys:
-            - auth-serverless-deps-{{ checksum "requirements.txt" }}
+            - discord-bot-deps-{{ checksum "requirements.txt" }}
       - run:
           name: Install and activate virtual environment
           command: |
@@ -34,7 +34,7 @@ jobs:
             . venv/bin/activate
             pip install -r requirements.txt
       - save_cache:
-          key: auth-serverless-deps-{{ checksum "requirements.txt" }}
+          key: discord-bot-deps-{{ checksum "requirements.txt" }}
           paths:
             - venv
   pytest:
@@ -42,10 +42,10 @@ jobs:
     steps:
       - restore_cache:
           keys:
-            - auth-serverless-{{ .Branch }}-{{ .Revision }}
+            - discord-bot-{{ .Branch }}-{{ .Revision }}
       - restore_cache:
           keys:
-            - auth-serverless-deps-{{ checksum "requirements.txt" }}
+            - discord-bot-deps-{{ checksum "requirements.txt" }}
       - run:
           name: Run coverage tests with pytest
           command: |
