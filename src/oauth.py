@@ -1,6 +1,6 @@
 from json import JSONDecodeError
 
-import client
+import src.client
 import os
 
 import requests

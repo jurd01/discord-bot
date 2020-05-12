@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 import hmac
 import json
 
-import client
+import src.client
 
 # wvmcwvubyojvenemtw
 # oqyt9-5m8ptoaekldsfm

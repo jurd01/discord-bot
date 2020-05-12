@@ -1,11 +1,6 @@
-import http.client
-import json
-import urllib.request
-import hashlib
-
 import requests
 
-from oauth import make_request
+from src.oauth import make_request
 
 
 def get_external_ip():
