@@ -14,22 +14,59 @@ jobs:
     <<: *defaults
     steps:
       - checkout
-      - python/load-cache
-      - python/install-deps
-      - python/save-cache
-  build-and-test:
-    <<: *defaults
-    executor: python/default
-    steps:
-      - checkout
-      - python/load-cache
+      - save_cache:
+          key: auth-serverless-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - ~/auth-serverless
+      - restore_cache:
+          keys:
+            - auth-serverless-deps-{{ checksum "requirements.txt" }}
       - run:
-          command: python -m pytest tests
-          name: Test
-      - python/save-cache
+          name: Install and activate virtual environment
+          command: |
+            if [ ! -d "venv" ]; then
+              pip install virtualenv
+              virtualenv venv
+            fi
+      - run:
+          name: Install circle requirements
+          command: |
+            . venv/bin/activate
+            pip install -r requirements.txt
+      - save_cache:
+          key: auth-serverless-deps-{{ checksum "requirements.txt" }}
+          paths:
+            - venv
+  pytest:
+    <<: *defaults
+    steps:
+      - restore_cache:
+          keys:
+            - auth-serverless-{{ .Branch }}-{{ .Revision }}
+      - restore_cache:
+          keys:
+            - auth-serverless-deps-{{ checksum "requirements.txt" }}
+      - run:
+          name: Run coverage tests with pytest
+          command: |
+            . venv/bin/activate
+            coverage run -m pytest
+      - run:
+          name: Generate coverage report
+          command: |
+            . venv/bin/activate
+            coverage xml -o test-coverage/coverage.xml
+      - store_test_results:
+          path: test-coverage
+      - store_artifacts:
+          path: test-coverage
       - sonarcloud/scan
 
 workflows:
-  main:
+  version: 2
+  build_and_test:
     jobs:
-      - build-and-test
+      - setup
+      - pytest:
+          requires:
+            - setup
