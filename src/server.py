@@ -1,92 +1,115 @@
+import json
+import hmac
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from threading import Thread
-
 from urllib.parse import urlparse
 
-import hmac
-import json
 
-import src.client
+from src.client import Client
+from src.util.logging import get_logger
 
-# wvmcwvubyojvenemtw
-# oqyt9-5m8ptoaekldsfm
+logger = get_logger(__name__)
+
+CONTENT_LENGTH = 'Content-Length'
+CONTENT_TYPE = 'Content-Type'
+X_HUB_SIGNATURE = 'X-Hub-Signature'
+
+client = None
 
 
 class Server(BaseHTTPRequestHandler):
-
     def do_GET(self):
-        print('handling get')
+        """
+        Handle the incoming challenge-response from Twitch to confirm webhook.
+
+        :return:
+        """
         query = urlparse(self.path).query
+        challenge = None
         try:
             query_components = dict(qc.split('=') for qc in query.split('&'))
             challenge = query_components['hub.challenge']
         except:
-            query_components = None
-            challenge = None
+            pass
 
         if challenge:
-            s = ''.join(x for x in challenge if x.isdigit())
-            print(s)
-            print(challenge)
+            logger.info(f'Received challenge: {challenge}')
             self.send_response(200, None)
             self.end_headers()
-            self.wfile.write(bytes(challenge, "utf-8"))
+            self.wfile.write(bytes(challenge, 'utf-8'))
+            logger.info("Challenge-response complete.")
         else:
             self.send_response(200, None)
             self.end_headers()
-            self.wfile.write(bytes("hello", "utf-8"))
+            self.wfile.write(bytes('howdy stranger :)', 'utf-8'))
 
     def do_POST(self):
-        print('handlign post')
-        if 'Content-Length' in self.headers:
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
+        """
+        Handle the incoming webhook payload and send a notification if stream is live.
 
-        if 'Content-Type' in self.headers:
-            content_type = str(self.headers['Content-Type'])
-        if 'X-Hub-Signature' in self.headers:
-            hub_signature = str(self.headers['X-Hub-Signature'])
-            algo, hsh = hub_signature.split('=')
-            print(hsh)
-            print(algo)
+        :return:
+        """
+        expected_headers = [CONTENT_LENGTH, CONTENT_TYPE, X_HUB_SIGNATURE]
 
-            secret = client.secret
+        if not all(header in self.headers for header in expected_headers):
+            raise ValueError('Missing headers.')
 
-            if post_data and algo and hsh:
-                gg = hmac.new(secret.encode(), post_data, algo)
-                if not hmac.compare_digest(hsh.encode(), gg.hexdigest().encode()):
-                    raise ConnectionError("Hash mismatch.")
+        content_length = int(self.headers['Content-Length'])
+        post_data = self.rfile.read(content_length)
+        content_type = str(self.headers['Content-Type'])    # unused
+        hub_signature = str(self.headers['X-Hub-Signature'])
+        algorithm, received_hash = hub_signature.split('=')
+        logger.debug(f'Message received with hash: {received_hash} and algorithm {algorithm}')
 
-        if None in (content_length, content_type, hub_signature):
-            raise ValueError("missing headers")
+        expected_hash = hmac.new(client.secret.encode(), post_data, algorithm)
+        if not hmac.compare_digest(received_hash.encode(), expected_hash.hexdigest().encode()):
+            raise ConnectionError('Hash mismatch.')
 
-        if post_data:
-            j = json.loads(post_data)
-            userid = (j["data"][0]["from_id"])
-            print(userid)
-            print(j)
-            self.send_response(200)
-            self.end_headers()
+        j = json.loads(post_data)
+        data = j['data'][0]
+        stream_status = data['stream_status']
+        """
+        {
+        'data': [{
+        'id': '0123456789',
+        'user_id': '5678',
+        'user_name': 'wjdtkdqhs',
+        'game_id': '21779',
+        'community_ids': [],
+        'type': 'live',
+        'title': 'Best Stream Ever',
+        'viewer_count': 417,
+        'started_at': '2017-12-01T10:09:45Z',
+        'language': 'en',
+        'thumbnail_url': 'https://link/to/thumbnail.jpg'
+        }]
+        }
+        """
+        logger.info(f'Received status: {stream_status}')
+        logger.debug(j)
+
+        # TODO discord bot send message
+
+        self.send_response(200)
+        self.end_headers()
 
 
 def main():
-    host_name = "0.0.0.0"
+    global client
+
+    host_name = '0.0.0.0'
     host_port = 65535
+    client = Client()
     twitch_id = client.get_user_id('stabbystabby')
-    # client.subscribe_to_get_followers(twitch_id)
+    client.subscribe_to_live_notifications(twitch_id)
 
     server = HTTPServer((host_name, host_port), Server)
     try:
-        print('test')
-        x = Thread(target=server.serve_forever)
-        x.start()
-        print("server started")
-
-        client.subscribe_to_get_followers(twitch_id)
+        server.serve_forever()
+        logger.info('Server started')
 
     except KeyboardInterrupt:
         server.server_close()
-        print("server closing")
+        logger.info('Server closing')
 
 
 if __name__ == '__main__':

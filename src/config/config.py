@@ -3,13 +3,13 @@ import os
 import re
 
 
+# Largely taken from a SO post, which I cannot for the life of me find.
 def parse_config(config_path):
     if not config_path:
         return {}
 
     if not os.path.exists(config_path):
-        raise IOError(f'The config path "{config_path}" is not a valid path. '
-                      'Please check that the path is correct and that the file exists.')
+        raise IOError(f'Config file at "{config_path}" not found.')
 
     try:
         pattern = re.compile('.*?{(\\w+)}.*?')
@@ -42,3 +42,6 @@ def parse_config(config_path):
         raise ValueError(error_message)
 
     return config
+
+
+# config = parse_config('./config.yaml')
