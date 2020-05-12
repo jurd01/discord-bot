@@ -23,7 +23,7 @@ jobs:
       - checkout
       - python/load-cache
       - run:
-          command: pytest tests
+          command: python -m pytest tests
           name: Test
       - python/save-cache
       - sonarcloud/scan
