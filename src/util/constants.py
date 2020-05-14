@@ -1,0 +1,16 @@
+import os
+
+CONTENT_LENGTH = 'Content-Length'
+CONTENT_TYPE = 'Content-Type'
+X_HUB_SIGNATURE = 'X-Hub-Signature'
+
+HOST_NAME = '0.0.0.0'
+HOST_PORT = 65535
+LEASE_SECONDS = 864000  # 864000 seconds = 10 days = max
+
+TWITCH_CLIENT_ID = os.getenv('TWITCH_CLIENT_ID')
+TWITCH_CLIENT_SECRET = os.getenv('TWITCH_CLIENT_SECRET')
+DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+
+SUBSCRIBE_TO_LIVE_NOTIFS_NAMES = ['stabbystabby']
+COMMAND_PREFIX = "!"
