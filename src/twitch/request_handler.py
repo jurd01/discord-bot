@@ -73,33 +73,36 @@ class RequestHandlerFactory:
                     raise ConnectionError('Hash mismatch.')
 
                 j = json.loads(post_data)
-                logger.info("")
-                data = j['data'][0]
-                stream_status = data['type']
-                """ example response
-                {
-                'data': [{
-                'id': '0123456789',
-                'user_id': '5678',
-                'user_name': 'wjdtkdqhs',
-                'game_id': '21779',
-                'community_ids': [],
-                'type': 'live',
-                'title': 'Best Stream Ever',
-                'viewer_count': 417,
-                'started_at': '2017-12-01T10:09:45Z',
-                'language': 'en',
-                'thumbnail_url': 'https://link/to/thumbnail.jpg'
-                }]
-                }
-                """
-                logger.info(f'Received status: {stream_status}')
-                logger.info(j)  # TODO debug
+                logger.info(j)
+                if j:
+                    data = j['data'][0]
+                    stream_status = data['type']
 
-                if stream_status == 'live':
-                    asyncio.create_task(self.discord_bot.send_live_notif(data))
+                    logger.info(f'Received status: {stream_status}')
 
+                    if stream_status == 'live':
+                        asyncio.create_task(self.discord_bot.send_live_notif(data))
+                else:
+                    logger.info('Stream ended.')  # TODO strikethrough stream message
                 self.send_response(200)
                 self.end_headers()
-
         return RequestHandler
+
+
+""" example response
+{
+'data': [{
+'id': '0123456789',
+'user_id': '5678',
+'user_name': 'wjdtkdqhs',
+'game_id': '21779',
+'community_ids': [],
+'type': 'live',
+'title': 'Best Stream Ever',
+'viewer_count': 417,
+'started_at': '2017-12-01T10:09:45Z',
+'language': 'en',
+'thumbnail_url': 'https://link/to/thumbnail.jpg'
+}]
+}
+"""
