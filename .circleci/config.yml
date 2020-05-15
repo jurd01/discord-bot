@@ -37,30 +37,30 @@ jobs:
           key: discord-bot-deps-{{ checksum "requirements.txt" }}
           paths:
             - venv
-  pytest:
-    <<: *defaults
-    steps:
-      - restore_cache:
-          keys:
-            - discord-bot-{{ .Branch }}-{{ .Revision }}
-      - restore_cache:
-          keys:
-            - discord-bot-deps-{{ checksum "requirements.txt" }}
-      - run:
-          name: Run coverage tests with pytest
-          command: |
-            . venv/bin/activate
-            coverage run -m pytest
-      - run:
-          name: Generate coverage report
-          command: |
-            . venv/bin/activate
-            coverage xml -o test-coverage/coverage.xml
-      - store_test_results:
-          path: test-coverage
-      - store_artifacts:
-          path: test-coverage
-      - sonarcloud/scan
+#  pytest:
+#    <<: *defaults
+#    steps:
+#      - restore_cache:
+#          keys:
+#            - discord-bot-{{ .Branch }}-{{ .Revision }}
+#      - restore_cache:
+#          keys:
+#            - discord-bot-deps-{{ checksum "requirements.txt" }}
+#      - run:
+#          name: Run coverage tests with pytest
+#          command: |
+#            . venv/bin/activate
+#            coverage run -m pytest
+#      - run:
+#          name: Generate coverage report
+#          command: |
+#            . venv/bin/activate
+#            coverage xml -o test-coverage/coverage.xml
+#      - store_test_results:
+#          path: test-coverage
+#      - store_artifacts:
+#          path: test-coverage
+#      - sonarcloud/scan
 
 workflows:
   version: 2

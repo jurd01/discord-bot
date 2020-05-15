@@ -1,5 +1,6 @@
 from discord.ext import commands
-from discord import utils
+
+from src.util.constants import ANNOUNCE_CHANNEL
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)
@@ -11,10 +12,6 @@ class Bot(commands.Bot):
         super().__init__(command_prefix, **options)
         self.remove_command('help')
         self.add_cog(Commands(command_prefix))
-        # for command in self.get_cog('Commands').walk_commands():
-        #     self.add_command(command)
-
-        # self.add_cog(Send())
 
     def run(self):
         super().run(self.token)
@@ -44,7 +41,7 @@ class Bot(commands.Bot):
         }
         """
         user_name = data['user_name']
-        await self.get_channel(710309731234873424).send(f'@everyone https://www.twitch.tv/{user_name}')
+        await self.get_channel(ANNOUNCE_CHANNEL).send(f'@everyone https://www.twitch.tv/{user_name}')
 
 
 class Commands(commands.Cog):
