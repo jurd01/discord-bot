@@ -8,3 +8,8 @@ Ignore these for now. There are no tests yet.
 - TWITCH_CLIENT_ID
 - TWITCH_CLIENT_SECRET
 - DISCORD_CLIENT_TOKEN
+
+## todo
+- persistence layer
+- tests
+- server agnosticism
