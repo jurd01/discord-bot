@@ -8,14 +8,14 @@ from src.util.logging import get_logger
 logger = get_logger(__name__)
 
 
-class Client:
+class TwitchClient:
     def __init__(self, client_id, secret):
         self.client_id = client_id
         self.secret = secret
         self.token = None
 
     @staticmethod
-    def get_external_ip():
+    def _get_external_ip():
         return requests.get('https://api.ipify.org').text
 
     def _refresh_token(self):
@@ -25,8 +25,7 @@ class Client:
             'grant_type': 'client_credentials',
         }
 
-        # don't use make_request
-        data = self.make_request('https://id.twitch.tv/oauth2/token', requests.post, params=params, use_token=False)
+        data = self._make_request('https://id.twitch.tv/oauth2/token', requests.post, params=params, use_token=False)
         logger.info('Got token from twitch API')
         logger.debug(data)
         with open('./token', 'w') as f:
@@ -43,8 +42,8 @@ class Client:
         if line:
             self.token = line.replace('\n', '').replace('\r', '')
 
-    def make_request(self, url, method, params=None, body=None, expected_code=requests.codes.ok,
-                     use_token=True, retry=0):
+    def _make_request(self, url, method, params=None, body=None, expected_code=requests.codes.ok,
+                      use_token=True, retry=0):
         """
 
         :param url:
@@ -71,35 +70,58 @@ class Client:
         if use_token:
             headers.update({'Authorization': f'Bearer {self.token}'})
 
-        logger.debug(f'Making {method.__name__.upper()} request to {url} with:')
-        logger.debug(f'headers: {headers}')
-        logger.debug(f'params: {params}')
-        logger.debug(f'body: {body}')
+        logger.debug(f'Making {method.__name__.upper()} request to {url} with:'
+                     f'headers: {headers}'
+                     f'params: {params}'
+                     f'body: {body}')
+
         r = method(url, headers=headers, params=params, json=body)
 
         if r.status_code == requests.codes.unauthorized:
             logger.error("Received 402 unauthorized. Refreshing token.")
             self._refresh_token()
-            self.make_request(url, method, params, body, retry + 1)
+            self._make_request(url, method, params, body, retry + 1)
 
         elif r.status_code != expected_code:
             # TODO exception
-            print(r.json())
+            # print(r.json())
             raise Exception(f'Received status code {r.status_code} but expected {expected_code}')
 
         if r.content:
             return r.json()
 
-    def get_user_id(self, login_name):
-        logger.info(f'Getting user ID for {login_name}')
-        data = self.make_request(f'https://api.twitch.tv/helix/users?login={login_name}', requests.get)
-        user_id = data.get('data')[0].get('id')
-        logger.info(f'Found user ID {user_id} for {login_name}')
+    def _get_user(self, user_id=None, user_name=None):
+        if not (user_id or user_name):
+            raise ValueError("user id or user name must not be null")
+        params = {}
+        if user_name:
+            params['login'] = user_name
+        if user_id:
+            params['id'] = user_id
+        return self._make_request('https://api.twitch.tv/helix/users', requests.get, params=params)['data'][0]
+
+    def get_user_id(self, user_name):
+        user_id = self._get_user(user_name=user_name).get('id')
+        logger.info(f'Found user ID {user_id} for {user_name}')
         return user_id
+
+    def get_user_name(self, user_id):
+        user_name = self._get_user(user_id=user_id).get('login')
+        logger.info(f'Found usesrname {user_name} for ID {user_id}')
+        return user_name
+
+    def get_game_name(self, game_id):
+        logger.info(f'Getting game name for {game_id}')
+        response = self._make_request(f'https://api.twitch.tv/helix/games', requests.get, params={'id': game_id})
+        logger.debug(response)
+        try:
+            return response['data'][0]['name']
+        except Exception as e:
+            logger.exception(e)
 
     def subscribe_to_live_notifications(self, user_id):
         topic = f'https://api.twitch.tv/helix/streams?user_id={user_id}'
-        callback = f'http://{self.get_external_ip()}:{HOST_PORT}/'
+        callback = f'http://{self._get_external_ip()}:{HOST_PORT}/'
         logger.debug(f'Callback address: {callback}')
         body = {
             'hub.mode': 'subscribe',
@@ -108,6 +130,5 @@ class Client:
             'hub.lease_seconds': LEASE_SECONDS,
             'hub.secret': self.secret
         }
-        self.make_request('https://api.twitch.tv/helix/webhooks/hub', requests.post,
-                          body=body, expected_code=requests.codes.accepted)
-        logger.info('Webhook subscription request complete')
+        self._make_request('https://api.twitch.tv/helix/webhooks/hub', requests.post,
+                           body=body, expected_code=requests.codes.accepted)

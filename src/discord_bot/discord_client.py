@@ -1,17 +1,25 @@
+import asyncio
+import re
+
 from discord.ext import commands
 
-from src.util.constants import ANNOUNCE_CHANNEL
+from src.abc.service import Service
+from src.twitch.twitchclient import TwitchClient
+from src.util.constants import SUBSCRIPTIONS, DISCORD_FORMATTING_CHARS
+from src.util.dataclasses import Notification, Subscription
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class Bot(commands.Bot):
-    def __init__(self, token, command_prefix, **options):
+class DiscordClient(commands.Bot, Service):
+    # TODO decouple twitch client
+    def __init__(self, token, command_prefix, twitch_client: TwitchClient, **options):
         self.token = token
         super().__init__(command_prefix, **options)
         self.remove_command('help')
         self.add_cog(Commands(command_prefix))
+        self.twitch_client = twitch_client
 
     def run(self):
         super().run(self.token)
@@ -22,9 +30,33 @@ class Bot(commands.Bot):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        logger.info(f"Discord bot started as {super()}")
+        logger.info(f"Discord bot started as {self.user.name}")
+        # await self.send_live_notif(Notification(1,1,'jurd_',1,'','live','live test!',1,'','',''))
 
-    async def send_live_notif(self, data):
+    def _build_live_notif(self, notif: Notification, sub: Subscription):
+        game_name = self.twitch_client.get_game_name(notif.game_id)
+        message = f'{sub.mention} {notif.user_name} is live! ' \
+            f'- {notif.title} ' \
+            f'- {game_name}\n'
+
+        for c in DISCORD_FORMATTING_CHARS:
+            message = message.replace(c, '\\' + c)
+
+        # don't replace chars in url
+        message += f'https://www.twitch.tv/{notif.user_name}'
+
+        logger.debug(f'Message to send: {message}')
+        return message
+
+    async def _send_live_notif(self, notif: Notification, sub: Subscription):
+        try:
+            await self.get_guild(sub.server_id).get_channel(sub.channel_id).send(
+                self._build_live_notif(notif, sub))
+        except Exception as e:
+            logger.exception(e)
+            # logger.error(e)
+
+    async def send_live_notif(self, notif: Notification):
         """
         {
             'id': '0123456789',
@@ -40,8 +72,8 @@ class Bot(commands.Bot):
             'thumbnail_url': 'https://link/to/thumbnail.jpg'
         }
         """
-        user_name = data['user_name']
-        await self.get_channel(ANNOUNCE_CHANNEL).send(f'@everyone https://www.twitch.tv/{user_name}')
+        await asyncio.gather(
+            *[self._send_live_notif(notif, sub) for sub in SUBSCRIPTIONS if sub.user_name == notif.user_name])
 
 
 class Commands(commands.Cog):

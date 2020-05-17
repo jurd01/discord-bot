@@ -2,9 +2,10 @@ import asyncio
 import hmac
 import json
 from http.server import BaseHTTPRequestHandler
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 from src.util.constants import CONTENT_LENGTH, CONTENT_TYPE, X_HUB_SIGNATURE, TWITCH_CLIENT_SECRET
+from src.util.dataclasses import Notification
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)
@@ -15,14 +16,17 @@ class RequestHandlerFactory:
     @staticmethod
     def build(client, discord_bot):
         class RequestHandler(BaseHTTPRequestHandler):
-            def __init__(self, *args, **kwargs):
-                super(RequestHandler, self).__init__(*args, **kwargs)
 
+            def __init__(self, *args, **kwargs):
                 self.client = client
                 self.discord_bot = discord_bot
+                super(RequestHandler, self).__init__(*args, **kwargs)
 
             def log_message(self, format, *args):
                 logger.debug(format % args)
+
+            def _get_query_components(self, path):
+                return dict(qc.split('=') for qc in urlparse(path).query.split('&'))
 
             def do_GET(self):
                 """
@@ -30,20 +34,17 @@ class RequestHandlerFactory:
 
                 :return:
                 """
-                query = urlparse(self.path).query
-                challenge = None
-                try:
-                    query_components = dict(qc.split('=') for qc in query.split('&'))
-                    challenge = query_components['hub.challenge']
-                except:
-                    pass
-
+                query_components = self._get_query_components(self.path)
+                challenge = query_components.get('hub.challenge')
                 if challenge:
-                    logger.info(f'Received challenge: {challenge}')
+                    logger.info(f'Received challenge with query: {query_components}.')
                     self.send_response(200, None)
                     self.end_headers()
                     self.wfile.write(bytes(challenge, 'utf-8'))
-                    logger.info("Challenge-response complete. Subscription confirmed.")
+
+                    user_id = self._get_query_components(unquote(query_components['hub.topic']))['user_id']
+                    user_name = self.client.get_user_name(user_id)
+                    logger.info(f"Challenge-response complete. Subscription confirmed for user {user_name}.")
                 else:
                     self.send_response(200, None)
                     self.end_headers()
@@ -69,19 +70,16 @@ class RequestHandlerFactory:
 
                 expected_hash = hmac.new(TWITCH_CLIENT_SECRET.encode(), post_data, algorithm)
                 if not hmac.compare_digest(received_hash.encode(), expected_hash.hexdigest().encode()):
-                    # TODO don't error
                     raise ConnectionError('Hash mismatch.')
 
                 j = json.loads(post_data)
                 logger.info(j)
-                if j:
-                    data = j['data'][0]
-                    stream_status = data['type']
-
-                    logger.info(f'Received status: {stream_status}')
-
-                    if stream_status == 'live':
-                        asyncio.create_task(self.discord_bot.send_live_notif(data))
+                if j and j['data']:
+                    notif = Notification(**j['data'][0])
+                    if notif.type == 'live':
+                        logger.info(
+                            f'User: {notif.user_name} went live with title: {notif.title}; game: {notif.game_id}')
+                        asyncio.create_task(self.discord_bot.send_live_notif(notif))
                 else:
                     logger.info('Stream ended.')  # TODO strikethrough stream message
                 self.send_response(200)
@@ -89,7 +87,7 @@ class RequestHandlerFactory:
         return RequestHandler
 
 
-""" example response
+""" example live response
 {
 'data': [{
 'id': '0123456789',
@@ -105,4 +103,8 @@ class RequestHandlerFactory:
 'thumbnail_url': 'https://link/to/thumbnail.jpg'
 }]
 }
+
+
+example offline response
+{'data': []}
 """
