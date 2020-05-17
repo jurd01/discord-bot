@@ -1,5 +1,6 @@
 token
 .idea/
+servers.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
