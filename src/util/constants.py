@@ -17,7 +17,7 @@ CONTENT_TYPE = 'Content-Type'
 X_HUB_SIGNATURE = 'X-Hub-Signature'
 
 HOST_NAME = '0.0.0.0'
-LEASE_SECONDS = 864000  # 864000 seconds = 10 days = max
+LEASE_SECONDS = 864000  # 864000 seconds = 10 days i= max
 COMMAND_PREFIX = "!"
 DISCORD_FORMATTING_CHARS = ['*', '_', '~', '`', '>']
 

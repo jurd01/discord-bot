@@ -1,13 +1,11 @@
 from http.server import HTTPServer
 from socketserver import ThreadingMixIn
-from typing import List
 
 from src.abc.service import Service
-from src.discord_bot.discord_client import DiscordClient
+from src.discord_client.discord_client import DiscordClient
 from src.twitch.twitchclient import TwitchClient
 from src.util.constants import HOST_NAME, HOST_PORT, SUBSCRIPTIONS
 from src.twitch.request_handler import RequestHandlerFactory
-from src.util.dataclasses import Subscription
 from src.util.logging import get_logger
 
 logger = get_logger(__name__)

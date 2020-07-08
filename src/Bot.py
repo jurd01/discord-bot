@@ -1,6 +1,6 @@
 import threading
 
-from src.discord_bot.discord_client import DiscordClient
+from src.discord_client.discord_client import DiscordClient
 from src.util.constants import TWITCH_CLIENT_SECRET, TWITCH_CLIENT_ID, DISCORD_BOT_TOKEN, COMMAND_PREFIX
 from src.twitch.twitchclient import TwitchClient
 from src.twitch.server import Server

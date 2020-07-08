@@ -2,6 +2,7 @@ import asyncio
 import hmac
 import json
 from http.server import BaseHTTPRequestHandler
+from multiprocessing.pool import Pool
 from urllib.parse import urlparse, unquote
 
 from src.util.constants import CONTENT_LENGTH, CONTENT_TYPE, X_HUB_SIGNATURE, TWITCH_CLIENT_SECRET
@@ -79,7 +80,10 @@ class RequestHandlerFactory:
                     if notif.type == 'live':
                         logger.info(
                             f'User: {notif.user_name} went live with title: {notif.title}; game: {notif.game_id}')
-                        asyncio.create_task(self.discord_bot.send_live_notif(notif))
+                        loop = asyncio.get_event_loop()
+                        if not loop:
+                            loop = asyncio.new_event_loop()
+                        asyncio.run_coroutine_threadsafe(self.discord_bot.send_live_notif(notif), loop)
                 else:
                     logger.info('Stream ended.')  # TODO strikethrough stream message
                 self.send_response(200)

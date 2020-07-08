@@ -1,5 +1,5 @@
 import asyncio
-import re
+import datetime
 
 from discord.ext import commands
 
@@ -7,7 +7,7 @@ from src.abc.service import Service
 from src.twitch.twitchclient import TwitchClient
 from src.util.constants import SUBSCRIPTIONS, DISCORD_FORMATTING_CHARS
 from src.util.dataclasses import Notification, Subscription
-from src.util.logging import get_logger
+from src.util.logging import get_logger, DATETIME_FMT
 
 logger = get_logger(__name__)
 
@@ -20,6 +20,9 @@ class DiscordClient(commands.Bot, Service):
         self.remove_command('help')
         self.add_cog(Commands(command_prefix))
         self.twitch_client = twitch_client
+        self.last_pings = {
+            644922446784495627: datetime.datetime.now() - datetime.timedelta(minutes=1)
+        }
 
     def run(self):
         super().run(self.token)
@@ -31,13 +34,27 @@ class DiscordClient(commands.Bot, Service):
     @commands.Cog.listener()
     async def on_ready(self):
         logger.info(f"Discord bot started as {self.user.name}")
-        # await self.send_live_notif(Notification(1,1,'jurd_',1,'','live','live test!',1,'','',''))
+
+        # notif = Notification(**{
+        #     'user_name': 'stabbystabby',
+        #     'title': 'title',
+        #     'bs': 'bs'
+        # })
+        #
+        # loop = asyncio.get_event_loop()
+        # if not loop:
+        #     loop = asyncio.new_event_loop()
+        # asyncio.run_coroutine_threadsafe(self.send_live_notif(notif), loop)
+
+        # await self.send_live_notif(Notification(1,1,'stabbystabby',1,'','live','live test!',1,'','',''))
 
     def _build_live_notif(self, notif: Notification, sub: Subscription):
-        game_name = self.twitch_client.get_game_name(notif.game_id)
         message = f'{sub.mention} {notif.user_name} is live! ' \
-            f'- {notif.title} ' \
-            f'- {game_name}\n'
+            f'- {notif.title} '
+        if notif.game_id:
+            game_name = self.twitch_client.get_game_name(notif.game_id)
+            message += f'- {game_name}'
+        message += '\n'
 
         for c in DISCORD_FORMATTING_CHARS:
             message = message.replace(c, '\\' + c)
@@ -49,9 +66,17 @@ class DiscordClient(commands.Bot, Service):
         return message
 
     async def _send_live_notif(self, notif: Notification, sub: Subscription):
+        if self.last_pings.get(sub.server_id) and (
+                datetime.datetime.now() - self.last_pings.get(sub.server_id)).seconds / 3600 < 1:
+            # last ping was < 1 hr ago
+            logger.info(f'Last notification sent to server {sub.server_id}:'
+                        f'{self.last_pings[sub.server_id].strftime(DATETIME_FMT)}.'
+                        f' Ignoring notification')
+            return
         try:
             await self.get_guild(sub.server_id).get_channel(sub.channel_id).send(
                 self._build_live_notif(notif, sub))
+            self.last_pings[sub.server_id] = datetime.datetime.now()
         except Exception as e:
             logger.exception(e)
             # logger.error(e)
@@ -72,6 +97,17 @@ class DiscordClient(commands.Bot, Service):
             'thumbnail_url': 'https://link/to/thumbnail.jpg'
         }
         """
+        logger.info(f'Send live notif called with {notif}')
+        # for sub in SUBSCRIPTIONS:
+        #     if sub.user_name == notif.user_name:
+        #         await self._send_live_notif(notif, sub)
+        # to_notify = [sub for sub in SUBSCRIPTIONS if sub.user_name == notif.user_name
+        #              and self.last_pings.get(sub.server_id)
+        #              and (self.last_pings[sub.server_id] - datetime.datetime.now()).seconds // 3600 < 1]  # if last ping was < 1 hour ago
+        # for sub in SUBSCRIPTIONS not in to_notify:
+        #     logger.info(f'Last notification sent to server {sub.server_id}:'
+        #                 f'{self.last_pings[sub.server_id].strftime(DATETIME_FMT)}.'
+        #                 f' Ignoring notification')
         await asyncio.gather(
             *[self._send_live_notif(notif, sub) for sub in SUBSCRIPTIONS if sub.user_name == notif.user_name])
 

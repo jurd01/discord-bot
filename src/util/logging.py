@@ -1,6 +1,8 @@
 import logging
 import os
 
+DATETIME_FMT = '%Y-%m-%d %H:%M:%S'
+
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 
 RESET = '\033[0m'
@@ -18,9 +20,9 @@ _LEVEL_COLORS = {
 
 class ColorFormatter(logging.Formatter):
     def __init__(self):
-        thread = ' tid: %(thread)s' if LOG_LEVEL == 'DEBUG' else ''
+        thread = ' tid=%(thread)s' if LOG_LEVEL == 'DEBUG' else ''
         super().__init__(f'{BLUE}[%(asctime)s]%(filename)s{thread} : %(levelname)s %(message)s{RESET}',
-                         '%Y-%m-%d %H:%M:%S')
+                         DATETIME_FMT)
 
     def format(self, record):
         level = record.levelname
